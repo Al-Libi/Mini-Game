@@ -1,0 +1,628 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Wordle Surprise 💘</title>
+  <style>
+    :root{
+      --bg:#0f1020;
+      --panel:#161833;
+      --tile:#1f2247;
+      --text:#f6f6ff;
+      --muted:#b9bbd6;
+      --good:#53d769;
+      --warn:#f7c948;
+      --bad:#3a3d66;
+      --outline:#2c3060;
+      --accent:#ff4d9d;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      background: radial-gradient(1200px 800px at 20% 0%, #1b1d3f 0%, var(--bg) 55%);
+      color:var(--text);
+      display:flex;
+      min-height:100vh;
+      align-items:center;
+      justify-content:center;
+      padding:18px;
+    }
+    .app{
+      width:min(520px, 100%);
+      background: rgba(22,24,51,0.75);
+      border:1px solid rgba(44,48,96,0.7);
+      border-radius:18px;
+      padding:18px 16px 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+      position:relative;
+      overflow:hidden;
+    }
+    header{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      margin-bottom:10px;
+    }
+    .title{display:flex; flex-direction:column; gap:2px;}
+    h1{margin:0;font-size:18px;letter-spacing:0.2px;}
+    .sub{margin:0;font-size:13px;color:var(--muted);}
+    .pill{
+      font-size:12px;
+      padding:8px 10px;
+      border-radius:999px;
+      background: rgba(255,77,157,0.12);
+      border:1px solid rgba(255,77,157,0.35);
+      color:#ffd3e7;
+      user-select:none;
+      white-space:nowrap;
+    }
+
+    .grid{
+      display:grid;
+      grid-template-rows: repeat(6, 1fr);
+      gap:10px;
+      padding:14px 10px 12px;
+      margin: 6px 0 10px;
+    }
+    .row{display:grid;grid-template-columns: repeat(4, 1fr);gap:10px;}
+    .tile{
+      height:62px;
+      border-radius:12px;
+      background: rgba(31,34,71,0.85);
+      border:1px solid rgba(44,48,96,0.9);
+      display:flex;align-items:center;justify-content:center;
+      font-weight:700;font-size:26px;letter-spacing:1px;text-transform:uppercase;
+      transition: transform 140ms ease, background 220ms ease, border-color 220ms ease;
+      user-select:none;
+    }
+    .tile.filled{border-color: rgba(255,255,255,0.12);}
+    .tile.reveal{transform: rotateX(90deg);}
+    .tile.good{ background: rgba(83,215,105,0.25); border-color: rgba(83,215,105,0.65); }
+    .tile.warn{ background: rgba(247,201,72,0.22); border-color: rgba(247,201,72,0.6); }
+    .tile.bad{  background: rgba(58,61,102,0.75); border-color: rgba(58,61,102,0.9); }
+
+    .keyboard{display:grid;gap:8px;padding: 8px 6px 4px;}
+    .kb-row{display:flex;gap:8px;justify-content:center;flex-wrap:nowrap;}
+    button.key{
+      appearance:none;border:none;border-radius:12px;
+      background: rgba(255,255,255,0.08);
+      border:1px solid rgba(255,255,255,0.08);
+      color:var(--text);
+      padding: 12px 10px;
+      font-weight:700;
+      min-width: 32px;
+      cursor:pointer;
+      transition: transform 120ms ease, background 180ms ease, border-color 180ms ease;
+      text-transform:uppercase;
+      font-size:14px;
+    }
+    button.key:active{ transform: scale(0.97); }
+    button.key.wide{ min-width: 74px; }
+    button.key.good{ background: rgba(83,215,105,0.25); border-color: rgba(83,215,105,0.6); }
+    button.key.warn{ background: rgba(247,201,72,0.22); border-color: rgba(247,201,72,0.55); }
+    button.key.bad{  background: rgba(58,61,102,0.75); border-color: rgba(58,61,102,0.9); }
+
+    .toast{
+      position:absolute;
+      top:14px;left:50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.45);
+      border:1px solid rgba(255,255,255,0.14);
+      padding:10px 12px;border-radius:12px;
+      font-size:13px;color:var(--text);
+      opacity:0;pointer-events:none;
+      transition: opacity 180ms ease, transform 180ms ease;
+    }
+    .toast.show{opacity:1;transform: translateX(-50%) translateY(6px);}
+
+    /* Modal / Pages */
+    .overlay{
+      position:fixed;inset:0;
+      background: rgba(0,0,0,0.6);
+      display:none;align-items:center;justify-content:center;
+      padding:18px;
+    }
+    .overlay.show{display:flex;}
+    .modal{
+      width:min(520px, 100%);
+      background: rgba(22,24,51,0.98);
+      border:1px solid rgba(255,77,157,0.35);
+      border-radius:18px;
+      padding:18px;
+      box-shadow: 0 20px 70px rgba(0,0,0,0.5);
+      position:relative;
+      overflow:hidden;
+    }
+    .heart-float{
+      position:absolute;right:-30px;top:24px;
+      opacity:0.22;font-size:140px;transform: rotate(12deg);
+      user-select:none;pointer-events:none;
+    }
+    .modal h2{margin:0 0 6px;font-size:20px;letter-spacing:0.2px;}
+    .modal p{margin:0 0 14px;color: var(--muted);line-height:1.35;}
+    .big{font-size:28px;margin: 6px 0 14px;}
+    .actions{display:flex;gap:10px;flex-wrap:wrap;}
+    .btn{
+      border:none;border-radius:14px;
+      padding:12px 14px;
+      font-weight:800;
+      cursor:pointer;
+      transition: transform 120ms ease, filter 180ms ease;
+    }
+    .btn:active{transform: scale(0.98);}
+    .btn-primary{
+      background: linear-gradient(135deg, #ff4d9d, #ff7ac0);
+      color:#240012;
+      flex:1;min-width: 140px;
+    }
+    .btn-ghost{
+      background: rgba(255,255,255,0.08);
+      border:1px solid rgba(255,255,255,0.12);
+      color:var(--text);
+    }
+
+    /* Secret page styling */
+    .secret-card{
+      margin-top:12px;
+      padding:14px;
+      border-radius:16px;
+      background: rgba(255,77,157,0.10);
+      border:1px solid rgba(255,77,157,0.25);
+    }
+    .choices{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:10px;
+      margin-top:12px;
+    }
+    .choice{
+      text-align:left;
+      padding:12px 12px;
+      border-radius:14px;
+      background: rgba(255,255,255,0.06);
+      border:1px solid rgba(255,255,255,0.10);
+      color:var(--text);
+      font-weight:750;
+      cursor:pointer;
+      transition: transform 120ms ease;
+    }
+    .choice:active{ transform: scale(0.985); }
+    .smallnote{margin-top:10px;color:var(--muted);font-size:13px;line-height:1.35;}
+
+    /* Confetti */
+    canvas#confetti{
+      position:fixed;inset:0;
+      pointer-events:none;
+      display:none;
+    }
+    canvas#confetti.show{display:block;}
+
+    @media (max-width: 420px){
+      .tile{ height:54px; font-size:24px; }
+      button.key{ padding:11px 8px; font-size:13px; border-radius:12px; }
+      .big{font-size:26px;}
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="confetti"></canvas>
+
+  <div class="app" id="gamePage">
+    <div class="toast" id="toast">Not in word list</div>
+
+    <header>
+      <div class="title">
+        <h1>Mini Wordle 💘</h1>
+        <p class="sub">Guess the 4-letter word in 6 tries.</p>
+      </div>
+      <div class="pill">Hint: romantic vibes</div>
+    </header>
+
+    <div class="grid" id="grid" aria-label="Word grid"></div>
+    <div class="keyboard" id="keyboard" aria-label="Keyboard"></div>
+  </div>
+
+  <div class="overlay" id="overlay" role="dialog" aria-modal="true">
+    <div class="modal">
+      <div class="heart-float">💗</div>
+
+      <!-- Screen 1 (Win) -->
+      <div id="winScreen">
+        <h2>You got it! 🎉</h2>
+        <p>Okay… one more question…</p>
+        <div class="big"><strong>Mezhgan, will you be my Valentine?</strong></div>
+        <div class="actions">
+          <button class="btn btn-primary" id="yesBtn">YES 💘</button>
+          <button class="btn btn-ghost" id="playAgainBtn">Play again</button>
+        </div>
+        <p class="smallnote" style="margin-top:10px;">(There’s a secret page after you press YES 🤫)</p>
+      </div>
+
+      <!-- Screen 2 (Secret Page) -->
+      <div id="secretScreen" style="display:none;">
+        <h2>Yessss! 💖</h2>
+        <p>Okay Mezhgan… you unlocked the secret page.</p>
+
+        <div class="secret-card">
+          <div class="big" style="margin:0 0 8px;"><strong>Pick our plan:</strong></div>
+          <div class="choices">
+            <button class="choice" data-plan="Dinner + dessert 🍰">🍽️ Dinner + dessert</button>
+            <button class="choice" data-plan="Movie night + snacks 🍿">🍿 Movie night + snacks</button>
+            <button class="choice" data-plan="Sunset walk + warm drinks ☕">🌅 Sunset walk + warm drinks</button>
+            <button class="choice" data-plan="Your choice… I’m yours 💘">💘 Your choice… I’m yours</button>
+          </div>
+          <div class="smallnote" id="pickedNote" style="margin-top:12px; display:none;"></div>
+        </div>
+
+        <div class="actions" style="margin-top:14px;">
+          <button class="btn btn-primary" id="copyBtn">Copy a cute message 💌</button>
+          <button class="btn btn-ghost" id="closeBtn">Close</button>
+        </div>
+
+        <p class="smallnote">
+          Tip: You can make this more “secret” by not telling her it exists — and just letting it appear after YES.
+        </p>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // --- Config ---
+    const ANSWER = "DATE";
+    const WORD_LEN = 4;
+    const MAX_ROWS = 6;
+
+    // Small allowed list so guesses feel "Wordle-like"
+    const ALLOWED = new Set([
+      "DATE","LOVE","DAYS","DINE","ROSE","KISS","HUGS","MOON","STAR","MUSE","LILY",
+      "CUTE","HART","MATE","BABE","DEAR","TRUE","RING","NOTE","POEM","PINK","HOLD"
+    ]);
+
+    // --- State ---
+    let row = 0;
+    let col = 0;
+    let board = Array.from({length: MAX_ROWS}, () => Array(WORD_LEN).fill(""));
+    let locked = false;
+
+    const gridEl = document.getElementById("grid");
+    const kbEl = document.getElementById("keyboard");
+    const toastEl = document.getElementById("toast");
+
+    const overlayEl = document.getElementById("overlay");
+    const winScreen = document.getElementById("winScreen");
+    const secretScreen = document.getElementById("secretScreen");
+
+    const yesBtn = document.getElementById("yesBtn");
+    const playAgainBtn = document.getElementById("playAgainBtn");
+    const closeBtn = document.getElementById("closeBtn");
+    const copyBtn = document.getElementById("copyBtn");
+
+    const pickedNote = document.getElementById("pickedNote");
+
+    // --- Build Grid ---
+    function renderGrid(){
+      gridEl.innerHTML = "";
+      for(let r=0;r<MAX_ROWS;r++){
+        const rowEl = document.createElement("div");
+        rowEl.className = "row";
+        rowEl.dataset.row = r;
+        for(let c=0;c<WORD_LEN;c++){
+          const tile = document.createElement("div");
+          tile.className = "tile";
+          tile.dataset.col = c;
+          tile.textContent = board[r][c];
+          if(board[r][c]) tile.classList.add("filled");
+          rowEl.appendChild(tile);
+        }
+        gridEl.appendChild(rowEl);
+      }
+    }
+
+    // --- Build Keyboard ---
+    const KB_ROWS = [
+      ["q","w","e","r","t","y","u","i","o","p"],
+      ["a","s","d","f","g","h","j","k","l"],
+      ["enter","z","x","c","v","b","n","m","back"]
+    ];
+
+    const keyState = {}; // letter -> 'good' | 'warn' | 'bad'
+
+    function renderKeyboard(){
+      kbEl.innerHTML = "";
+      KB_ROWS.forEach((keys) => {
+        const rowEl = document.createElement("div");
+        rowEl.className = "kb-row";
+        keys.forEach(k => {
+          const btn = document.createElement("button");
+          btn.className = "key";
+          btn.dataset.key = k;
+          btn.textContent = (k === "back") ? "⌫" : k;
+          if(k === "enter" || k === "back") btn.classList.add("wide");
+          if(keyState[k]) btn.classList.add(keyState[k]);
+          btn.addEventListener("click", () => handleKey(k));
+          rowEl.appendChild(btn);
+        });
+        kbEl.appendChild(rowEl);
+      });
+    }
+
+    function setToast(msg){
+      toastEl.textContent = msg;
+      toastEl.classList.add("show");
+      setTimeout(() => toastEl.classList.remove("show"), 1200);
+    }
+
+    function handleKey(key){
+      if(locked) return;
+
+      if(key === "enter"){
+        submitGuess();
+        return;
+      }
+      if(key === "back"){
+        if(col > 0){
+          col--;
+          board[row][col] = "";
+          updateRowUI(row);
+        }
+        return;
+      }
+
+      if(/^[a-z]$/.test(key) && col < WORD_LEN){
+        board[row][col] = key.toUpperCase();
+        col++;
+        updateRowUI(row);
+      }
+    }
+
+    function updateRowUI(r){
+      const rowEl = gridEl.querySelector(`.row[data-row="${r}"]`);
+      [...rowEl.children].forEach((tile, i) => {
+        tile.textContent = board[r][i];
+        tile.classList.toggle("filled", !!board[r][i]);
+      });
+    }
+
+    function scoreGuess(guess, answer){
+      const res = Array(WORD_LEN).fill("bad");
+      const a = answer.split("");
+      const g = guess.split("");
+
+      for(let i=0;i<WORD_LEN;i++){
+        if(g[i] === a[i]){
+          res[i] = "good";
+          a[i] = null;
+          g[i] = null;
+        }
+      }
+      for(let i=0;i<WORD_LEN;i++){
+        if(g[i]){
+          const idx = a.indexOf(g[i]);
+          if(idx !== -1){
+            res[i] = "warn";
+            a[idx] = null;
+          }
+        }
+      }
+      return res;
+    }
+
+    async function revealRow(r, statuses){
+      locked = true;
+      const rowEl = gridEl.querySelector(`.row[data-row="${r}"]`);
+      const tiles = [...rowEl.children];
+
+      for(let i=0;i<WORD_LEN;i++){
+        const tile = tiles[i];
+        tile.classList.add("reveal");
+        await wait(120);
+        tile.classList.remove("reveal");
+
+        tile.classList.add(statuses[i]);
+
+        const letter = board[r][i].toLowerCase();
+        const current = keyState[letter];
+        const incoming = statuses[i];
+        const priority = { bad: 0, warn: 1, good: 2 };
+        if(!current || priority[incoming] > priority[current]){
+          keyState[letter] = incoming;
+        }
+        renderKeyboard();
+        await wait(80);
+      }
+      locked = false;
+    }
+
+    function wait(ms){ return new Promise(res => setTimeout(res, ms)); }
+
+    function submitGuess(){
+      if(col < WORD_LEN){
+        setToast("Not enough letters");
+        return;
+      }
+      const guess = board[row].join("");
+      if(!ALLOWED.has(guess)){
+        setToast("Try a different word");
+        return;
+      }
+
+      const statuses = scoreGuess(guess, ANSWER);
+
+      revealRow(row, statuses).then(() => {
+        if(guess === ANSWER){
+          win();
+          return;
+        }
+        row++;
+        col = 0;
+
+        if(row >= MAX_ROWS){
+          setToast("So close! Answer was DATE 💘");
+        }
+      });
+    }
+
+    // --- Win / Secret Page ---
+    function win(){
+      overlayEl.classList.add("show");
+      winScreen.style.display = "block";
+      secretScreen.style.display = "none";
+      startConfetti();
+    }
+
+    yesBtn.addEventListener("click", () => {
+      // Go to secret page (still inside this same HTML file)
+      winScreen.style.display = "none";
+      secretScreen.style.display = "block";
+      yesBtn.disabled = true;
+
+      // Make it feel like a "new page"
+      window.location.hash = "#yes";
+      setToast("Unlocked 💖");
+    });
+
+    playAgainBtn.addEventListener("click", () => {
+      overlayEl.classList.remove("show");
+      stopConfetti();
+      resetGame();
+    });
+
+    closeBtn?.addEventListener("click", () => {
+      overlayEl.classList.remove("show");
+      stopConfetti();
+    });
+
+    // Choose a plan
+    document.querySelectorAll(".choice").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const plan = btn.getAttribute("data-plan");
+        pickedNote.style.display = "block";
+        pickedNote.textContent = `Locked in: ${plan} — I’ll make it happen 💘`;
+      });
+    });
+
+    // Copy a cute message
+    copyBtn?.addEventListener("click", async () => {
+      const planText = pickedNote.style.display !== "none"
+        ? pickedNote.textContent.replace("Locked in: ", "")
+        : "a cute plan together 💘";
+
+      const msg = `Mezhgan 💖\nYou said YES!\nNow let’s do: ${planText}\nWhen are you free? 😌`;
+      try{
+        await navigator.clipboard.writeText(msg);
+        setToast("Copied 💌");
+        copyBtn.textContent = "Copied ✅";
+        setTimeout(()=> copyBtn.textContent = "Copy a cute message 💌", 1200);
+      }catch(e){
+        // Clipboard might fail on some hosting contexts; fallback
+        setToast("Copy not supported here");
+      }
+    });
+
+    function resetGame(){
+      row = 0; col = 0;
+      board = Array.from({length: MAX_ROWS}, () => Array(WORD_LEN).fill(""));
+      for(const k in keyState) delete keyState[k];
+      renderGrid();
+      renderKeyboard();
+      yesBtn.disabled = false;
+      yesBtn.textContent = "YES 💘";
+      pickedNote.style.display = "none";
+      pickedNote.textContent = "";
+      window.location.hash = "";
+    }
+
+    // Keyboard support
+    window.addEventListener("keydown", (e) => {
+      const k = e.key.toLowerCase();
+      if(k === "enter") handleKey("enter");
+      else if(k === "backspace") handleKey("back");
+      else if(/^[a-z]$/.test(k)) handleKey(k);
+    });
+
+    // If someone opens directly with #yes, show the secret page (still “secret” but shareable)
+    function handleHash(){
+      if(window.location.hash === "#yes"){
+        overlayEl.classList.add("show");
+        winScreen.style.display = "none";
+        secretScreen.style.display = "block";
+        startConfetti();
+      }
+    }
+    window.addEventListener("hashchange", handleHash);
+
+    // Confetti (simple canvas)
+    const confettiCanvas = document.getElementById("confetti");
+    const ctx = confettiCanvas.getContext("2d");
+    let confettiRunning = false;
+    let pieces = [];
+
+    function resizeCanvas(){
+      confettiCanvas.width = window.innerWidth * devicePixelRatio;
+      confettiCanvas.height = window.innerHeight * devicePixelRatio;
+      ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+    }
+    window.addEventListener("resize", resizeCanvas);
+
+    function startConfetti(){
+      resizeCanvas();
+      confettiCanvas.classList.add("show");
+      confettiRunning = true;
+      pieces = Array.from({length: 140}, () => ({
+        x: Math.random() * window.innerWidth,
+        y: -20 - Math.random() * window.innerHeight,
+        w: 6 + Math.random()*6,
+        h: 8 + Math.random()*10,
+        vx: -1 + Math.random()*2,
+        vy: 2 + Math.random()*4,
+        r: Math.random() * Math.PI,
+        vr: -0.1 + Math.random()*0.2,
+        c: `hsl(${Math.floor(Math.random()*360)}, 90%, 65%)`
+      }));
+      requestAnimationFrame(tickConfetti);
+    }
+
+    function stopConfetti(){
+      confettiRunning = false;
+      confettiCanvas.classList.remove("show");
+      ctx.clearRect(0,0,window.innerWidth,window.innerHeight);
+    }
+
+    function tickConfetti(){
+      if(!confettiRunning) return;
+      ctx.clearRect(0,0,window.innerWidth,window.innerHeight);
+
+      for(const p of pieces){
+        p.x += p.vx;
+        p.y += p.vy;
+        p.r += p.vr;
+
+        if(p.y > window.innerHeight + 30){
+          p.y = -20;
+          p.x = Math.random() * window.innerWidth;
+        }
+        if(p.x < -30) p.x = window.innerWidth + 30;
+        if(p.x > window.innerWidth + 30) p.x = -30;
+
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.r);
+        ctx.fillStyle = p.c;
+        ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
+        ctx.restore();
+      }
+      requestAnimationFrame(tickConfetti);
+    }
+
+    // Init
+    renderGrid();
+    renderKeyboard();
+    handleHash();
+  </script>
+</body>
+</html>
