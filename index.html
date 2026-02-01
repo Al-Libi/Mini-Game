@@ -81,7 +81,7 @@
   .tile.warn{ background: rgba(247,201,72,0.24); border-color: rgba(247,201,72,0.55); }
   .tile.bad { background: rgba(58,61,102,0.85); border-color: rgba(58,61,102,0.95); }
 
-  /* ✅ aligned keyboard */
+  /* aligned keyboard */
   .keyboard{
     display:grid;
     gap:8px;
@@ -105,10 +105,10 @@
     font-weight:800;
     cursor:pointer;
     text-transform:uppercase;
-    transition: transform 120ms ease, background 180ms ease, border-color 180ms ease;
     user-select:none;
     flex: 1;
     min-width: 0;
+    transition: transform 120ms ease, background 180ms ease, border-color 180ms ease;
   }
   button.key:active{ transform: scale(0.97); }
   button.key.wide{ flex: 1.35; }
@@ -136,7 +136,7 @@
     transform: translateX(-50%) translateY(6px);
   }
 
-  /* Win overlay */
+  /* Overlay / Modal */
   .overlay{
     position:fixed;
     inset:0;
@@ -148,7 +148,7 @@
   }
   .overlay.show{ display:flex; }
   .modal{
-    width:min(420px, 100%);
+    width:min(440px, 100%);
     background: rgba(22,24,51,0.98);
     border:1px solid rgba(255,255,255,0.12);
     border-radius:18px;
@@ -158,27 +158,50 @@
     position:relative;
     overflow:hidden;
   }
-  .yay{
-    font-size:30px;
+  .question{
+    font-size:22px;
     font-weight:900;
-    margin: 4px 0 6px;
-    letter-spacing:0.2px;
+    margin: 6px 0 12px;
   }
-  .kitty{
-    font-size:64px;
-    margin: 6px 0 10px;
+  .btn-row{
+    position:relative; /* so NO can teleport within it */
+    display:flex;
+    gap:12px;
+    justify-content:center;
+    align-items:center;
+    flex-wrap:wrap;
+    min-height: 58px;
+    margin-top:10px;
   }
   .btn{
     border:none;
     border-radius:14px;
-    padding:12px 14px;
+    padding:12px 16px;
     font-weight:900;
     cursor:pointer;
     background: rgba(255,255,255,0.10);
     border:1px solid rgba(255,255,255,0.14);
     color:var(--text);
+    user-select:none;
+  }
+  .btn.primary{
+    background: linear-gradient(135deg, rgba(83,215,105,0.95), rgba(83,215,105,0.55));
+    color: #06150b;
+    border-color: rgba(83,215,105,0.25);
   }
   .btn:active{ transform: scale(0.98); }
+  .note{ color:var(--muted); font-size:13px; margin-top:10px; }
+
+  /* Yay screen */
+  .yay{
+    font-size:32px;
+    font-weight:1000;
+    margin: 4px 0 6px;
+  }
+  .kitty{
+    font-size:70px;
+    margin: 6px 0 12px;
+  }
 
   /* Confetti */
   canvas#confetti{
@@ -215,9 +238,22 @@
 
 <div class="overlay" id="overlay" role="dialog" aria-modal="true">
   <div class="modal">
-    <div class="yay">Yayyyy! 🎉</div>
-    <div class="kitty">😺</div>
-    <button class="btn" id="playAgainBtn">Play again</button>
+    <!-- Screen A: Yes/No -->
+    <div id="askScreen">
+      <div class="question">Will you be my Valentine?</div>
+      <div class="btn-row" id="btnRow">
+        <button class="btn primary" id="yesBtn">YES</button>
+        <button class="btn" id="noBtn" aria-label="No">NO</button>
+      </div>
+      <div class="note">(try pressing “NO” 😄)</div>
+    </div>
+
+    <!-- Screen B: Yay -->
+    <div id="yayScreen" style="display:none;">
+      <div class="yay">Yayyyy! 🎉</div>
+      <div class="kitty">😺</div>
+      <button class="btn" id="playAgainBtn">Play again</button>
+    </div>
   </div>
 </div>
 
@@ -237,16 +273,23 @@ const status  = Array.from({length: MAX_ROWS}, () => Array(WORD_LEN).fill(""));
 const gridEl = document.getElementById("grid");
 const kbEl = document.getElementById("keyboard");
 const toastEl = document.getElementById("toast");
+
 const overlayEl = document.getElementById("overlay");
+const askScreen = document.getElementById("askScreen");
+const yayScreen = document.getElementById("yayScreen");
+const yesBtn = document.getElementById("yesBtn");
+const noBtn = document.getElementById("noBtn");
+const btnRow = document.getElementById("btnRow");
 const playAgainBtn = document.getElementById("playAgainBtn");
 
+/* ===== Toast ===== */
 function setToast(msg){
   toastEl.textContent = msg;
   toastEl.classList.add("show");
   setTimeout(() => toastEl.classList.remove("show"), 1100);
 }
 
-/* Build grid once */
+/* ===== Grid build once ===== */
 function buildGrid(){
   gridEl.innerHTML = "";
   for(let r=0;r<MAX_ROWS;r++){
@@ -278,7 +321,7 @@ function updateGrid(){
   }
 }
 
-/* Keyboard */
+/* ===== Keyboard ===== */
 const KB_ROWS = [
   ["q","w","e","r","t","y","u","i","o","p"],
   ["a","s","d","f","g","h","j","k","l"],
@@ -314,7 +357,7 @@ function updateKeyboardColors(){
   });
 }
 
-/* Wordle scoring */
+/* ===== Wordle scoring ===== */
 function scoreGuess(guess, answer){
   const res = Array(WORD_LEN).fill("bad");
   const a = answer.split("");
@@ -339,7 +382,7 @@ function scoreGuess(guess, answer){
   return res;
 }
 
-/* Input */
+/* ===== Input ===== */
 function handleKey(key){
   if(overlayEl.classList.contains("show")) return;
 
@@ -375,6 +418,7 @@ function submitGuess(){
   for(let i=0;i<WORD_LEN;i++){
     status[row][i] = res[i];
 
+    // update keyboard with priority good>warn>bad
     const letter = letters[row][i].toLowerCase();
     const current = keyState[letter];
     const incoming = res[i];
@@ -388,7 +432,7 @@ function submitGuess(){
   updateKeyboardColors();
 
   if(guess === ANSWER){
-    win();
+    showAsk();
     return;
   }
 
@@ -408,11 +452,19 @@ window.addEventListener("keydown", (e) => {
   else if(/^[a-z]$/.test(k)) handleKey(k);
 });
 
-/* Win modal + confetti */
-function win(){
+/* ===== Overlay flow ===== */
+function showAsk(){
   overlayEl.classList.add("show");
+  askScreen.style.display = "block";
+  yayScreen.style.display = "none";
+  setupNoTeleport();
   startConfetti();
 }
+
+yesBtn.addEventListener("click", () => {
+  askScreen.style.display = "none";
+  yayScreen.style.display = "block";
+});
 
 playAgainBtn.addEventListener("click", () => {
   overlayEl.classList.remove("show");
@@ -420,6 +472,38 @@ playAgainBtn.addEventListener("click", () => {
   resetGame();
 });
 
+/* ===== NO teleporting ===== */
+let teleportReady = false;
+
+function setupNoTeleport(){
+  if(teleportReady) return;
+  teleportReady = true;
+
+  const moveNo = () => {
+    noBtn.style.position = "absolute";
+
+    const parentRect = btnRow.getBoundingClientRect();
+    const btnRect = noBtn.getBoundingClientRect();
+
+    const pad = 6;
+    const maxX = Math.max(pad, parentRect.width - btnRect.width - pad);
+    const maxY = Math.max(pad, parentRect.height - btnRect.height - pad);
+
+    const x = pad + Math.random() * (maxX - pad);
+    const y = pad + Math.random() * (maxY - pad);
+
+    noBtn.style.left = `${x}px`;
+    noBtn.style.top  = `${y}px`;
+  };
+
+  noBtn.addEventListener("mouseenter", moveNo);
+  noBtn.addEventListener("click", (e) => { e.preventDefault(); moveNo(); });
+  noBtn.addEventListener("touchstart", (e) => { e.preventDefault(); moveNo(); }, {passive:false});
+
+  setTimeout(moveNo, 150);
+}
+
+/* ===== Reset ===== */
 function resetGame(){
   row = 0; col = 0;
   for(let r=0;r<MAX_ROWS;r++){
@@ -431,9 +515,15 @@ function resetGame(){
   for(const k in keyState) delete keyState[k];
   updateGrid();
   updateKeyboardColors();
+
+  // reset NO positioning
+  noBtn.style.position = "relative";
+  noBtn.style.left = "";
+  noBtn.style.top = "";
+  teleportReady = false;
 }
 
-/* Confetti canvas */
+/* ===== Confetti ===== */
 const confettiCanvas = document.getElementById("confetti");
 const ctx = confettiCanvas.getContext("2d");
 let confettiRunning = false;
@@ -500,7 +590,7 @@ function tickConfetti(){
   requestAnimationFrame(tickConfetti);
 }
 
-/* Init */
+/* ===== Init ===== */
 buildGrid();
 updateGrid();
 buildKeyboard();
